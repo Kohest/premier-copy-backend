@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String            @id @default(cuid())
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  email           String            @unique
+  name            String?
+  role            String            @default("user")
+  password        String
+  avatar          String?
+  Review          Review[]
+  watched         Content[]         @relation("WatchedContent")
+  favoriteContent FavoriteContent[]
+  subscriptions   Subscription[]    @relation(name: "UserSubscriptions")
+  payments        Payment[]         @relation(name: "UserPayments")
+
+  @@map("user")
+}
+
+model Content {
+  id              String            @id @default(cuid())
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  title           String
+  description     String
+  releaseYear     String?
+  ageRating       String?
+  country         String?
+  duration        String?
+  posterUrl       String?           @map("poster_url")
+  genres          Genre[]           @relation(name: "ContentGenres")
+  reviews         Review[]          @relation(name: "ContentReviews")
+  Movie           Movie[]
+  Series          Series[]
+  trailer         ContentTrailer[]
+  User            User[]            @relation("WatchedContent")
+  favoriteContent FavoriteContent[]
+  collections     Collection[]      @relation(name: "ContentInCollection")
+  banner          Banner[]          @relation("ContentBanner")
+
+  @@map("content")
+}
+
+model ContentTrailer {
+  id          String  @id @default(cuid())
+  qualityName String
+  videoUrl    String
+  contentId   String
+  content     Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@map("content_trailer")
+}
+
+model FavoriteContent {
+  id        String  @default(cuid())
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String
+
+  @@unique([userId, contentId])
+  @@map("favorite_content")
+}
+
+model Movie {
+  id        String       @id @default(cuid())
+  content   Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String       @map("content_id")
+  videos    MovieVideo[]
+  isFree    Boolean
+
+  @@map("movie")
+}
+
+model Series {
+  id        String   @id @default(cuid())
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String   @map("content_id")
+  seasons   Season[]
+
+  @@map("series")
+}
+
+model Season {
+  id       String    @id @default(cuid())
+  number   Int
+  episodes Episode[]
+  series   Series    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId String    @map("series_id")
+
+  @@map("season")
+}
+
+model Episode {
+  id          String         @id @default(cuid())
+  title       String
+  number      Int
+  isFree      Boolean
+  posterUrl   String
+  description String
+  duration    String
+  season      Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  seasonId    String         @map("season_id")
+  videos      EpisodeVideo[]
+
+  @@map("episode")
+}
+
+model EpisodeVideo {
+  id          String  @id @default(cuid())
+  qualityName String
+  videoUrl    String
+  episodeId   String
+  episode     Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@map("episode_video")
+}
+
+model MovieVideo {
+  id          String @id @default(cuid())
+  qualityName String
+  videoUrl    String
+  movieId     String
+  movie       Movie  @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@map("movie_video")
+}
+
+model Review {
+  id        String  @id @default(cuid())
+  rating    Int
+  comment   String?
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+  content   Content @relation(name: "ContentReviews", fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String  @map("content_id")
+
+  @@unique([userId, contentId])
+  @@map("review")
+}
+
+model Genre {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  contents Content[] @relation(name: "ContentGenres")
+
+  @@map("genre")
+}
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  posterUrl   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  contents    Content[] @relation(name: "ContentInCollection")
+
+  @@map("collection")
+}
+
+model UniqueSubscription {
+  id            String         @id @default(cuid())
+  durationDays  Int
+  type          String
+  price         Float
+  image         String
+  salePercent   Int?
+  subscriptions Subscription[] @relation(name: "UniqueSubscriptionSubscriptions")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  payments      Payment[]      @relation(name: "SubscriptionPayments")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  endDate              DateTime
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  uniqueSubscriptionId String
+  uniqueSubscription   UniqueSubscription @relation(name: "UniqueSubscriptionSubscriptions", fields: [uniqueSubscriptionId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User               @relation(name: "UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                   String             @id @default(cuid())
+  amount               Float
+  status               PaymentStatus      @default(pending)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  userId               String
+  user                 User               @relation(name: "UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  uniqueSubscriptionId String
+  uniqueSubscription   UniqueSubscription @relation(name: "SubscriptionPayments", fields: [uniqueSubscriptionId], references: [id], onDelete: Cascade)
+  transactionId        String
+
+  @@map("payment")
+}
+
+model Banner {
+  id        String  @id @default(cuid())
+  title     String
+  subtitle  String
+  image     String
+  contentId String
+  content   Content @relation(name: "ContentBanner", fields: [contentId], references: [id], onDelete: Cascade)
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  canceled
+  expired_on_confirmation
+}
